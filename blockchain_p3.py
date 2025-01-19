@@ -95,15 +95,6 @@ hangman = w3.eth.contract(
 coins = ["bitcoin", "ethereum", "solana", "dogecoin", "avalanche", "stellar", "chainlink", "shiba inu", "polkadot", "pudge penguins",
          "bitget token", "litecoin", "hyperliquid", "near protocol", "worldcoin", "internet computer", "artificial superintelligence alliance", "thorchain", "cosmos", "optimism",]
 
-"""
-# Check whether someone is already playing
-if (hangman.functions.viewPlayerName()) != '':
-  # Ask player's name and send to the contract
-  tx_hash = hangman.functions.setPlayerName(input("Please insert player's name ")).transact()
-  tx_receipt = w3.eth.wait_for_transaction_receipt(tx_hash)
-else:
-  print("Someone is already playing")
-"""
 
 # choose a word randomly
 word = random.choice(coins)
@@ -112,9 +103,12 @@ word = random.choice(coins)
 tx_hash = hangman.functions.setWord(word).transact()
 tx_receipt = w3.eth.wait_for_transaction_receipt(tx_hash)
 
-# Show #alphabet with '_'
-quiz = '_ ' *(len(word))
-print(quiz)
+# Show alphabet with '_' and empty space with "-"
+def transform_string(s):
+    return ''.join('_ ' if char.isalpha() else '- ' for char in s)
+    
+quiz = transform_string(word)
+print(quiz)  # "hi hi" -> "_ _ - _ _ "
 
 # send to the contract
 tx_hash = hangman.functions.setQuiz(quiz).transact()
