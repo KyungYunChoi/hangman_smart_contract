@@ -27,12 +27,14 @@ compiled_sol = compile_source(
     pragma solidity >0.5.0;
 
     contract Hangman {
-        string public playerName;  // <-- to prevent multiple plyer
+        string public playerName;  // Do we need?
+        bool public gameRunning;
         string public word;
         string public quiz;
 
         constructor() public {
             playerName = '';  //do we need this?
+            gameRunning = true;
         }
 
         function setPlayerName(string memory _playerName) public{
