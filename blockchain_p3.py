@@ -7,19 +7,23 @@ Original file is located at
     https://colab.research.google.com/drive/1ptUY3-Zag7v4NWtyq-4s1J_mWSDKznRI
 """
 """
-!pip install web3==6.0.0b11
-!pip install -U "web3[tester]"
-!pip install py-solc-x
+Requirements:
+pip install web3==6.0.0b11
+pip install -U "web3[tester]"
+pip install py-solc-x
 """
 
 from solcx import get_installable_solc_versions
-print(get_installable_solc_versions())
+#print(get_installable_solc_versions())
 
 from web3 import Web3
-from solcx import install_solc
+from solcx import install_solc, set_solc_version
 install_solc('0.8.28') # Install a specific solc version.
+set_solc_version('0.8.28') # Set Solidity version for compilation
 from solcx import compile_source
 import random
+import warnings
+warnings.simplefilter("ignore", ResourceWarning)
 
 # Solidity source code
 compiled_sol = compile_source(
