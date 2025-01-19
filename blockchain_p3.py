@@ -95,6 +95,7 @@ hangman = w3.eth.contract(
 coins = ["bitcoin", "ethereum", "solana", "dogecoin", "avalanche", "stellar", "chainlink", "shiba inu", "polkadot", "pudge penguins",
          "bitget token", "litecoin", "hyperliquid", "near protocol", "worldcoin", "internet computer", "artificial superintelligence alliance", "thorchain", "cosmos", "optimism",]
 
+"""
 # Check whether someone is already playing
 if (hangman.functions.viewPlayerName()) != '':
   # Ask player's name and send to the contract
@@ -102,6 +103,7 @@ if (hangman.functions.viewPlayerName()) != '':
   tx_receipt = w3.eth.wait_for_transaction_receipt(tx_hash)
 else:
   print("Someone is already playing")
+"""
 
 # choose a word randomly
 word = random.choice(coins)
