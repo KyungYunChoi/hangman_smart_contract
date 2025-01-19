@@ -24,6 +24,7 @@ from solcx import compile_source
 import random
 import warnings
 warnings.simplefilter("ignore", ResourceWarning)
+import GameLogic as gl
 
 # Solidity source code
 compiled_sol = compile_source(
@@ -104,6 +105,10 @@ coins = ["bitcoin", "ethereum", "solana", "dogecoin", "avalanche", "stellar", "c
 
 # choose a word randomly
 word = random.choice(coins)
+
+#call game logic
+gl.word= word
+gl.gameGuess(word)
 
 # send to contract
 tx_hash = hangman.functions.setWord(word).transact()

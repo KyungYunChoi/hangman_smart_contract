@@ -78,6 +78,6 @@ def draw (misses, wrong):
     
 
 
-wrong = ["a", "b", "c"]
-for i in range(9):
-    draw(i, wrong)
+#wrong = ["a", "b", "c"]
+#for i in range(9):
+#    draw(i, wrong)
