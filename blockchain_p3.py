@@ -39,8 +39,14 @@ compiled_sol = compile_source(
 
         constructor() public {
             playerName = '';  //do we need this?
-            gameRunning = true;
         }
+
+        // function startGame() public {
+        // require(!gameRunning, "Game is already running");
+        // gameRunning = true; <- 
+        // }
+
+        // function stopGame() public{} 
 
         function setPlayerName(string memory _playerName) public{
             playerName = _playerName;
