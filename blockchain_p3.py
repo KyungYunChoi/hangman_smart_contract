@@ -13,20 +13,22 @@ pip install -U "web3[tester]"
 pip install py-solc-x
 """
 
-from solcx import get_installable_solc_versions
+#from solcx import get_installable_solc_versions
 #print(get_installable_solc_versions())
 
 from web3 import Web3
-from solcx import install_solc, set_solc_version
-install_solc('0.8.28') # Install a specific solc version.
+from solcx import set_solc_version
+#install_solc('0.8.28') # Install a specific solc version.
 set_solc_version('0.8.28') # Set Solidity version for compilation
 from solcx import compile_source
 import random
 import warnings
-warnings.simplefilter("ignore", ResourceWarning)
-import GameLogic as gl
+import draw_hangman as d
 
-# Solidity source code
+warnings.simplefilter("ignore", ResourceWarning)
+
+
+#-----------------------------------Solidity source code-----------------------------------#
 compiled_sol = compile_source(
     '''
     pragma solidity >0.5.0;
@@ -70,57 +72,134 @@ compiled_sol = compile_source(
     output_values=['abi', 'bin']
 )
 
+#-----------------------------------Smart Contract part-----------------------------------#
 # retrieve the contract interface
-contract_id, contract_interface = compiled_sol.popitem()
+#contract_id, contract_interface = compiled_sol.popitem()
 
 # get bytecode / bin
-bytecode = contract_interface['bin']
+#bytecode = contract_interface['bin']
 
 # get abi
-abi = contract_interface['abi']
+#abi = contract_interface['abi']
 
 # web3.py instance
-w3 = Web3(Web3.EthereumTesterProvider())
+#w3 = Web3(Web3.EthereumTesterProvider())
 
 # set pre-funded account as sender
-w3.eth.default_account = w3.eth.accounts[0]
+#w3.eth.default_account = w3.eth.accounts[0]
 
-Hangman = w3.eth.contract(abi=abi, bytecode=bytecode)
+#Hangman = w3.eth.contract(abi=abi, bytecode=bytecode)
 
 # Submit the transaction that deploys the contract
-tx_hash = Hangman.constructor().transact()
+#tx_hash = Hangman.constructor().transact()
 
 # Wait for the transaction to be mined, and get the transaction receipt
-tx_receipt = w3.eth.wait_for_transaction_receipt(tx_hash)
+#tx_receipt = w3.eth.wait_for_transaction_receipt(tx_hash)
 
-hangman = w3.eth.contract(
-    address=tx_receipt.contractAddress,
-    abi=abi
-)
-
-# Word bag
-coins = ["bitcoin", "ethereum", "solana", "dogecoin", "avalanche", "stellar", "chainlink", "shiba inu", "polkadot", "pudge penguins",
-         "bitget token", "litecoin", "hyperliquid", "near protocol", "worldcoin", "internet computer", "artificial superintelligence alliance", "thorchain", "cosmos", "optimism",]
-
-
-# choose a word randomly
-word = random.choice(coins)
-
-#call game logic
-gl.word= word
-gl.gameGuess(word)
+#hangman = w3.eth.contract(
+#    address=tx_receipt.contractAddress,
+#    abi=abi
+#)
 
 # send to contract
-tx_hash = hangman.functions.setWord(word).transact()
-tx_receipt = w3.eth.wait_for_transaction_receipt(tx_hash)
+#tx_hash = hangman.functions.setWord(word).transact()
+#tx_receipt = w3.eth.wait_for_transaction_receipt(tx_hash)
 
 # Show alphabet with '_' and empty space with "-"
-def transform_string(s):
-    return ''.join('_ ' if char.isalpha() else '- ' for char in s)
+#def transform_string(s):
+#    return ''.join('_ ' if char.isalpha() else '- ' for char in s)
     
-quiz = transform_string(word)
-print(quiz)  # "hi hi" -> "_ _ - _ _ "
+#quiz = transform_string(word)
+#print(quiz)  # "hi hi" -> "_ _ - _ _ "
 
 # send to the contract
-tx_hash = hangman.functions.setQuiz(quiz).transact()
-tx_receipt = w3.eth.wait_for_transaction_receipt(tx_hash)
+#tx_hash = hangman.functions.setQuiz(quiz).transact()
+#tx_receipt = w3.eth.wait_for_transaction_receipt(tx_hash)
+
+#-----------------------------------Python part-----------------------------------#
+
+coins = ["bitcoin", "ethereum", "solana", "dogecoin", "avalanche", "stellar",
+         "chainlink", "shiba inu", "polkadot", "pudge penguins",
+         "bitget token", "litecoin", "hyperliquid", "near protocol", "worldcoin",
+         "internet computer", "artificial superintelligence alliance",
+         "thorchain", "cosmos", "optimism"]
+
+word = random.choice(coins)
+isWin = False
+misses = 0
+charCorrect = []
+charWrong = []
+
+def gameGuess(word):
+
+    global misses, isWin
+
+    print("_" * 50 + "\n")
+    #print('test',word)
+    showCorrectAndWrongGuess(word)
+    d.draw(misses,charWrong)
+    charInput = askPlayerInput()
+
+    if charInput in word:
+        charCorrect.append(charInput)
+        print(charInput)
+    else:
+        charWrong.append(charInput)
+        misses+=1
+        
+    isWin = checkWin(charCorrect, word)
+
+def checkWin(correct,word):
+
+    if all(char in correct or char == ' ' for char in word):
+        print("*" * 80)
+        print("Congratulations! You won!")
+        print("The name of the cryptocurrency is: " + word + ".")
+        print("*" * 80)
+        return True
+    return False
+
+def askPlayerInput():
+
+    validInput = False
+
+    while validInput == False:
+        charInput = input('\nEnter a single character: ')
+        if charInput in charCorrect or charInput in charWrong:
+            print('Please enter other char.')
+        elif any(char.isupper() for char in charInput):
+            print('Please enter lowercase char.')
+        elif charInput.isalpha() and charInput!=' ' and len(charInput)==1:
+            validInput = True
+        else:
+            print('Please enter only one character!')
+    return charInput
+
+def showCorrectAndWrongGuess(word):
+
+    wordSplit = list(word)
+
+    print('Word:')
+    for i, char in enumerate(word):
+        if char == ' ':
+            print(' ', end="")
+        elif char in charCorrect:
+            print(char, end="")
+        else:
+            print('-', end="")
+
+          
+
+if __name__ == "__main__":
+
+    print("_"*50)
+    print("| Welcome to Hangman!" + " " * 28 + "|")
+    print("| The target word is a name of a cryptocurrency. |")
+
+    while misses < 7 and not isWin:
+        gameGuess(word)
+
+    if misses == 7:
+        d.draw(misses, charWrong)
+        print("_"*50)
+        print("Game Over! You lost. :(")
