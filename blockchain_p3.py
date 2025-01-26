@@ -10,117 +10,111 @@ Original file is located at
 Requirements:
 pip install web3==6.0.0b11
 pip install -U "web3[tester]"
-pip install py-solc-x
+pip install py-solc-x (Doesn't work; Use sudo dnf install solc)
 """
 
-#from solcx import get_installable_solc_versions
-#print(get_installable_solc_versions())
-
-from web3 import Web3
-from solcx import set_solc_version
-#install_solc('0.8.28') # Install a specific solc version.
-set_solc_version('0.8.28') # Set Solidity version for compilation
-from solcx import compile_source
-import random
 import warnings
+warnings.simplefilter("ignore", ResourceWarning)
+from web3 import Web3
+from solcx import compile_source, install_solc
+install_solc('0.8.28')
+
+from eth_tester import EthereumTester
+import random
 import draw_hangman as d
 
-warnings.simplefilter("ignore", ResourceWarning)
+
 
 
 #-----------------------------------Solidity source code-----------------------------------#
-compiled_sol = compile_source(
-    '''
-    pragma solidity >0.5.0;
+contract_source_code = """
+pragma solidity ^0.8.0;
 
-    contract Hangman {
-        string public playerName;  // Do we need?
-        bool public gameRunning;
-        string public word;
-        string public quiz;
+contract Hangman {
+    string private word;
+    bytes32 private hashedWord;
+    address public owner;
+    uint8 public maxMisses;
+    uint8 public misses;
+    string public guessedWord;
+    bool public isGameOver;
+    mapping(uint256 => bool) public guessedIndices;
 
-        constructor() public {
-            playerName = '';  //do we need this?
+    event Guess(address indexed player, string guessedWord, bool isCorrect);
+    event GameOver(string result, string finalWord);
+
+    constructor(string memory _word, uint8 _maxMisses) {
+        owner = msg.sender;
+        word = _word;
+        hashedWord = keccak256(abi.encodePacked(_word));
+        maxMisses = _maxMisses;
+        misses = 0;
+       // guessedWord = string(abi.encodePacked(new bytes(_word.length)));
+        isGameOver = false;
+    }
+
+    function guessLetter(string memory letter) public {
+        require(!isGameOver, "Game is already over.");
+        require(bytes(letter).length == 1, "Guess must be a single character.");
+
+        bytes memory wordBytes = bytes(word);
+        bytes memory guessedBytes = bytes(guessedWord);
+        bool isCorrect = false;
+
+        for (uint256 i = 0; i < wordBytes.length; i++) {
+            if (
+                !guessedIndices[i] &&
+                keccak256(abi.encodePacked(letter)) == keccak256(abi.encodePacked(wordBytes[i]))
+            ) {
+                guessedBytes[i] = bytes(letter)[0];
+                guessedIndices[i] = true;
+                isCorrect = true;
+            }
         }
 
-        // function startGame() public {
-        // require(!gameRunning, "Game is already running");
-        // gameRunning = true; <- 
-        // }
+        guessedWord = string(guessedBytes);
 
-        // function stopGame() public{} 
-
-        function setPlayerName(string memory _playerName) public{
-            playerName = _playerName;
+        if (isCorrect) {
+            emit Guess(msg.sender, guessedWord, true);
+        } else {
+            misses++;
+            emit Guess(msg.sender, guessedWord, false);
         }
 
-        function viewPlayerName() view public returns (string memory) {
-            return playerName;
-        }
-
-        function setWord(string memory _word) public {
-            word = _word;
-        }
-
-        function getWord() view public returns (string memory) {
-            return word;
-        }
-
-        function setQuiz(string memory _quiz) public {
-            quiz = _quiz;
-        }
-
-        function getQuiz() view public returns (string memory) {
-            return quiz;
+        if (misses >= maxMisses) {
+            isGameOver = true;
+            emit GameOver("You lost!", word);
+        } else if (keccak256(abi.encodePacked(guessedWord)) == hashedWord) {
+            isGameOver = true;
+            emit GameOver("You won!", word);
         }
     }
-    ''',
-    output_values=['abi', 'bin']
-)
+
+    function getGuessedWord() public view returns (string memory) {
+        return guessedWord;
+    }
+}
+"""
 
 #-----------------------------------Smart Contract part-----------------------------------#
-# retrieve the contract interface
-#contract_id, contract_interface = compiled_sol.popitem()
+eth_tester = EthereumTester()
+w3 = Web3(Web3.EthereumTesterProvider(eth_tester))
+owner_account = w3.eth.accounts[0]
+player_account = w3.eth.accounts[1]
 
-# get bytecode / bin
-#bytecode = contract_interface['bin']
+balance_wei = w3.eth.get_balance(owner_account)
+balance_ether = w3.from_wei(balance_wei, 'ether')
+print(f"Account {owner_account} has {balance_ether} Ether.")
 
-# get abi
-#abi = contract_interface['abi']
+balance_wei = w3.eth.get_balance(player_account)
+balance_ether = w3.from_wei(balance_wei, 'ether')
+print(f"Account {player_account} has {balance_ether} Ether.")
 
-# web3.py instance
-#w3 = Web3(Web3.EthereumTesterProvider())
 
-# set pre-funded account as sender
-#w3.eth.default_account = w3.eth.accounts[0]
+compiled_sol = compile_source(contract_source_code, output_values=["abi", "bin"])
+#print(compiled_sol)
 
-#Hangman = w3.eth.contract(abi=abi, bytecode=bytecode)
 
-# Submit the transaction that deploys the contract
-#tx_hash = Hangman.constructor().transact()
-
-# Wait for the transaction to be mined, and get the transaction receipt
-#tx_receipt = w3.eth.wait_for_transaction_receipt(tx_hash)
-
-#hangman = w3.eth.contract(
-#    address=tx_receipt.contractAddress,
-#    abi=abi
-#)
-
-# send to contract
-#tx_hash = hangman.functions.setWord(word).transact()
-#tx_receipt = w3.eth.wait_for_transaction_receipt(tx_hash)
-
-# Show alphabet with '_' and empty space with "-"
-#def transform_string(s):
-#    return ''.join('_ ' if char.isalpha() else '- ' for char in s)
-    
-#quiz = transform_string(word)
-#print(quiz)  # "hi hi" -> "_ _ - _ _ "
-
-# send to the contract
-#tx_hash = hangman.functions.setQuiz(quiz).transact()
-#tx_receipt = w3.eth.wait_for_transaction_receipt(tx_hash)
 
 #-----------------------------------Python part-----------------------------------#
 
@@ -197,6 +191,9 @@ def showCorrectAndWrongGuess(word):
           
 
 if __name__ == "__main__":
+
+    #Hangman = w3.eth.contract(abi=contract_interface["abi"], bytecode=contract_interface[bin])
+    #tx_hash = Hangman.constructor(word, 7).transact()
 
     print("_"*50)
     print("| Welcome to Hangman!" + " " * 28 + "|")
