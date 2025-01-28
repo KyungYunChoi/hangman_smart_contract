@@ -16,83 +16,80 @@ pip install py-solc-x (Doesn't work; Use sudo dnf install solc)
 import warnings
 warnings.simplefilter("ignore", ResourceWarning)
 from web3 import Web3
-from solcx import compile_source, install_solc
+from solcx import compile_source, install_solc, set_solc_version
 install_solc('0.8.28')
+set_solc_version('0.8.28')
 
 from eth_tester import EthereumTester
 import random
 import draw_hangman as d
 
-
-
-
 #-----------------------------------Solidity source code-----------------------------------#
 contract_source_code = """
-pragma solidity ^0.8.0;
+// SPDX-License-Identifier: UNIDENTIFIED
+pragma solidity >=0.8.2 <0.9.0;
 
 contract Hangman {
-    string private word;
-    bytes32 private hashedWord;
-    address public owner;
-    uint8 public maxMisses;
-    uint8 public misses;
+
+    uint256 private missedCounter;
+    bool private isWin;
+    bytes1 private charInput;
     string public guessedWord;
-    bool public isGameOver;
-    mapping(uint256 => bool) public guessedIndices;
+    bytes1[] private charCorrect;
+    bytes1[] private charWrong;
 
-    event Guess(address indexed player, string guessedWord, bool isCorrect);
-    event GameOver(string result, string finalWord);
-
-    constructor(string memory _word, uint8 _maxMisses) {
-        owner = msg.sender;
-        word = _word;
-        hashedWord = keccak256(abi.encodePacked(_word));
-        maxMisses = _maxMisses;
-        misses = 0;
-       // guessedWord = string(abi.encodePacked(new bytes(_word.length)));
-        isGameOver = false;
+    function setInputChar(bytes1 ch) public {
+        charInput = ch;
     }
 
-    function guessLetter(string memory letter) public {
-        require(!isGameOver, "Game is already over.");
-        require(bytes(letter).length == 1, "Guess must be a single character.");
+    function setMisses() public {
+        missedCounter = missedCounter + 1;
+    }
 
-        bytes memory wordBytes = bytes(word);
-        bytes memory guessedBytes = bytes(guessedWord);
-        bool isCorrect = false;
+    function getMisses() public view returns (uint256) {
+        return missedCounter;
+    }
 
-        for (uint256 i = 0; i < wordBytes.length; i++) {
-            if (
-                !guessedIndices[i] &&
-                keccak256(abi.encodePacked(letter)) == keccak256(abi.encodePacked(wordBytes[i]))
-            ) {
-                guessedBytes[i] = bytes(letter)[0];
-                guessedIndices[i] = true;
-                isCorrect = true;
-            }
-        }
-
-        guessedWord = string(guessedBytes);
-
-        if (isCorrect) {
-            emit Guess(msg.sender, guessedWord, true);
-        } else {
-            misses++;
-            emit Guess(msg.sender, guessedWord, false);
-        }
-
-        if (misses >= maxMisses) {
-            isGameOver = true;
-            emit GameOver("You lost!", word);
-        } else if (keccak256(abi.encodePacked(guessedWord)) == hashedWord) {
-            isGameOver = true;
-            emit GameOver("You won!", word);
-        }
+    function setGuessedWord(string memory word) public {
+        guessedWord = word;
     }
 
     function getGuessedWord() public view returns (string memory) {
         return guessedWord;
     }
+
+    function getCharCorrect() public view returns (bytes1[] memory) {
+        return charCorrect;
+    }
+
+    function getCharWrong() public view returns (bytes1[] memory) {
+        return charWrong;
+    }
+
+    function containsChar(string memory word, bytes1 char) public pure returns (bool) {
+        bytes memory wordBytes = bytes(word);
+
+        for (uint256 i = 0; i < wordBytes.length; i++) {
+            if (wordBytes[i] == char) {
+                return true; 
+            }
+        }
+        return false;
+    }
+
+    function gameGuess() public {
+        bool isCorrect = containsChar(guessedWord, charInput);
+
+        if (isCorrect) {
+            charCorrect.push(charInput);
+        } else {
+            charWrong.push(charInput);
+            setMisses();
+        }
+        emit GuessAttempt(charInput, isCorrect);
+    }
+
+    event GuessAttempt(bytes1 char, bool isCorrect);
 }
 """
 
@@ -114,6 +111,23 @@ print(f"Account {player_account} has {balance_ether} Ether.")
 compiled_sol = compile_source(contract_source_code, output_values=["abi", "bin"])
 #print(compiled_sol)
 
+# retrieve the contract interface
+contract_id, contract_interface = compiled_sol.popitem()
+
+# get bytecode / bin
+bytecode = contract_interface['bin']
+
+# get abi
+abi = contract_interface['abi']
+
+# web3.py instance
+w3 = Web3(Web3.EthereumTesterProvider())
+
+# set pre-funded account as sender
+w3.eth.default_account = w3.eth.accounts[0]
+
+Hangman = w3.eth.contract(abi=abi, bytecode=bytecode)
+
 
 
 #-----------------------------------Python part-----------------------------------#
@@ -130,23 +144,49 @@ misses = 0
 charCorrect = []
 charWrong = []
 
+# Submit the transaction that deploys the contract
+tx_hash = Hangman.constructor().transact()
+
+# Wait for the transaction to be mined, and get the transaction receipt
+tx_receipt = w3.eth.wait_for_transaction_receipt(tx_hash)
+
+hangman = w3.eth.contract(
+    address=tx_receipt.contractAddress,
+    abi=abi
+)
+
+word_encoded = word.encode("utf-8")
+tx_hash = hangman.functions.setGuessedWord(word_encoded.decode()).transact()
+w3.eth.wait_for_transaction_receipt(tx_hash)
+
 def gameGuess(word):
 
-    global misses, isWin
+    global misses, isWin, charCorrect, charWrong
 
     print("_" * 50 + "\n")
-    #print('test',word)
+    charCorrect_byts = hangman.functions.getCharCorrect().call()
+    charWrong_byts = hangman.functions.getCharWrong().call()
+    charCorrect = [byte.decode('utf-8') for byte in charCorrect_byts]
+    charWrong = [byte.decode('utf-8') for byte in charWrong_byts]
+
     showCorrectAndWrongGuess(word)
     d.draw(misses,charWrong)
-    charInput = askPlayerInput()
 
-    if charInput in word:
-        charCorrect.append(charInput)
-        print(charInput)
-    else:
-        charWrong.append(charInput)
-        misses+=1
-        
+    charInput = askPlayerInput()
+    charInput_byts = charInput.encode("utf-8")
+    tx_hash = hangman.functions.setInputChar(charInput_byts).transact()
+    tx_receipt = w3.eth.wait_for_transaction_receipt(tx_hash)
+
+    tx_hash = hangman.functions.gameGuess().transact()
+    tx_receipt = w3.eth.wait_for_transaction_receipt(tx_hash)
+    print(w3.eth.get_balance(owner_account))
+    print(w3.eth.get_balance(player_account))
+
+    for log in tx_receipt.logs:
+        event = hangman.events.GuessAttempt().process_log(log)
+        print(f"Guessed Character: {event['args']['char']}, Correct: {event['args']['isCorrect']}")
+
+    misses = hangman.functions.getMisses().call()
     isWin = checkWin(charCorrect, word)
 
 def checkWin(correct,word):
@@ -180,6 +220,7 @@ def showCorrectAndWrongGuess(word):
     wordSplit = list(word)
 
     print('Word:')
+    print(word)
     for i, char in enumerate(word):
         if char == ' ':
             print(' ', end="")
@@ -206,3 +247,4 @@ if __name__ == "__main__":
         d.draw(misses, charWrong)
         print("_"*50)
         print("Game Over! You lost. :(")
+        print("The word is:", word)
